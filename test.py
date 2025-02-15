@@ -19,8 +19,11 @@ def fibonacci_layout():
         return
     
     x, y, w, h = 0, 0, screen_width, screen_height
+
+    print("DAMN DANIEL" + str(screen_width) + " OK " + str(screen_height))
     for i, win in enumerate(windows):
-        try:
+        print(win.title)
+        """ try:
             print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
             win.moveTo(x, y)
             win.resizeTo(w, h)
@@ -32,7 +35,7 @@ def fibonacci_layout():
             x += w
         else:
             h //= 2
-            y += h
+            y += h """
 
 def main():
     print("Tiling Window Manager started. Press Win+Shift+W to toggle Fibonacci mode.")
