@@ -27,7 +27,7 @@ def get_windows():
     current_desktop_windows = []
     
     for win in windows:
-        if not win.title or win.isMinimized:
+        if not win.title or win.isMinimized or win.title == 'Program Manager':
             continue
         
         try:
@@ -73,9 +73,31 @@ def fibonacci_layout():
     x, y, w, h = 0, 0, screen_width, screen_height
 
     for i, win in enumerate(windows):
-        if i % 2 == 0:
-            ## even windows left
-            w = math.floor(w/2)
+        print(len(windows))
+        if i != len(windows)-1:
+            if i % 2 == 0:
+                ## even windows left
+                w = math.floor(w/2)
+                try:
+                    print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
+                    win.moveTo(x, y)
+                    win.resizeTo(w, h)
+                    x = x + w 
+                except Exception as e:
+                    print(f"Could not move {win.title}: {e}")
+            else:
+                ## odd windows top
+                h = math.floor(h/2)
+                try:
+                    print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
+                    win.moveTo(x, y)
+                    win.resizeTo(w, h)
+                    y = y + h
+                except Exception as e:
+                    print(f"Could not move {win.title}: {e}")
+        else:
+            #print("last window ")
+            #print(x, y, w, h)
             try:
                 print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
                 win.moveTo(x, y)
@@ -83,39 +105,6 @@ def fibonacci_layout():
                 x = x + w 
             except Exception as e:
                 print(f"Could not move {win.title}: {e}")
-        else:
-            ## odd windows top
-            h = math.floor(h/2)
-            try:
-                print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
-                win.moveTo(x, y)
-                win.resizeTo(w, h)
-                y = y + h
-            except Exception as e:
-                print(f"Could not move {win.title}: {e}")
-
-        """ try:
-            print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
-            win.moveTo(x, y)
-            win.resizeTo(w, h)
-        except Exception as e:
-            print(f"Could not move {win.title}: {e}")
-
-        # Update the position and size for the next window
-        if i % 2 == 0:  # Adjust width for even-indexed windows
-            x += w  # Move x to the right by the width of the current window
-            w //= 2  # Half the width for the next window
-            # Check if the next window will be off-screen horizontally
-            if x + w > screen_width:
-                x = 0  # Reset to the left edge
-                y += h  # Move down to the next row
-                h //= 2  # Half the height for the next window if we move to the next row
-        else:  # Adjust height for odd-indexed windows
-            y += h  # Move y down by the height of the current window
-            h //= 2  # Half the height for the next window
-            # Check if the next window will be off-screen vertically
-            if y + h > screen_height:
-                break  # Stop if we've run out of space on the screen """
 
 def main():
     print("Tiling Window Manager started. Press Win+Shift+W to toggle Fibonacci mode.")
