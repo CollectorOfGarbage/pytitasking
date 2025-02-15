@@ -1,12 +1,12 @@
 import pygetwindow as gw
 import pyautogui
-import pywinctl
 import keyboard
 import time
 
 def get_windows():
-    windows = [win for win in gw.getWindowsWithTitle('') if win.visible]
-    print(f"Detected {len(windows)} visible windows.")
+    # Get all windows, including hidden ones, by removing the visibility check
+    windows = gw.getWindowsWithTitle('')
+    print(f"Detected {len(windows)} windows on the virtual desktop.")
     return windows
 
 def fibonacci_layout():
@@ -15,7 +15,7 @@ def fibonacci_layout():
     num_windows = len(windows)
     
     if num_windows == 0:
-        print("No visible windows detected.")
+        print("No windows detected.")
         return
     
     x, y, w, h = 0, 0, screen_width, screen_height
