@@ -7,6 +7,8 @@ from ctypes import wintypes
 import tkinter as tk
 from tkinter import messagebox, Frame, Label, Button, Scrollbar, Checkbutton, BooleanVar, StringVar, Canvas
 from tkinter import LEFT, RIGHT, BOTH, X, Y, W, TOP, NW
+import hashlib
+import colorsys
 
 # Function to get visible windows on the current virtual desktop
 def get_windows():
@@ -129,11 +131,16 @@ class WindowSelectorApp:
         
         self.windows = get_windows()
         self.window_vars = []  # BooleanVars for checkboxes
+        self.custom_order = []  # Keep track of custom window order
         self.preview_stringvars = {
             "title": StringVar(value=""),
             "size": StringVar(value=""),
             "position": StringVar(value=""),
         }
+        
+        # Variables for dragging
+        self.drag_data = {"x": 0, "y": 0, "item": None, "index": -1}
+        self.preview_items = []  # List of (rect_id, text_id, window_index)
         
         # Main frame
         main_frame = Frame(root, padx=10, pady=10)
@@ -196,10 +203,22 @@ class WindowSelectorApp:
         Label(preview_box, textvariable=self.preview_stringvars["position"]).pack(anchor=W, pady=(0, 5))
         
         # Layout preview section
-        Label(bottom_frame, text="Layout Preview", font=("Arial", 12, "bold")).pack(anchor=W)
+        preview_label_frame = Frame(bottom_frame)
+        preview_label_frame.pack(fill=X)
+        
+        Label(preview_label_frame, text="Layout Preview", font=("Arial", 12, "bold")).pack(side=LEFT)
+        Label(preview_label_frame, 
+              text="Drag windows to reorder them", 
+              font=("Arial", 9, "italic"), 
+              fg="gray").pack(side=LEFT, padx=10)
         
         self.preview_canvas = Canvas(bottom_frame, bg="lightgray", height=200)
         self.preview_canvas.pack(fill=X, expand=True, pady=5)
+        
+        # Bind events for dragging
+        self.preview_canvas.tag_bind("window", "<ButtonPress-1>", self.on_drag_start)
+        self.preview_canvas.tag_bind("window", "<B1-Motion>", self.on_drag_motion)
+        self.preview_canvas.tag_bind("window", "<ButtonRelease-1>", self.on_drag_stop)
         
         # Buttons
         button_frame = Frame(main_frame)
@@ -207,7 +226,7 @@ class WindowSelectorApp:
         
         Button(button_frame, text="Clear All", command=self.clear_all).pack(side=LEFT, padx=5)
         Button(button_frame, text="Select All", command=self.select_all).pack(side=LEFT, padx=5)
-        Button(button_frame, text="Update Preview", command=self.update_layout_preview).pack(side=LEFT, padx=5)
+        Button(button_frame, text="Reset Order", command=self.reset_order).pack(side=LEFT, padx=5)
         
         Button(button_frame, 
                text="Apply Fibonacci Layout", 
@@ -259,26 +278,118 @@ class WindowSelectorApp:
     def clear_all(self):
         for var in self.window_vars:
             var.set(False)
+        self.custom_order = []  # Clear custom order
         self.update_layout_preview()
     
     def select_all(self):
         for var in self.window_vars:
             var.set(True)
+        self.custom_order = []  # Reset custom order when selecting all
+        self.update_layout_preview()
+    
+    def reset_order(self):
+        self.custom_order = []  # Reset to default order
         self.update_layout_preview()
     
     def get_selected_windows(self):
+        if self.custom_order:
+            # Return windows in custom order
+            return self.custom_order
+        
+        # Return windows in original order
         selected_windows = []
         for i, var in enumerate(self.window_vars):
             if var.get():
                 selected_windows.append(self.windows[i])
         return selected_windows
     
+    def on_drag_start(self, event):
+        # Record the item and its location
+        for rect_id, text_id, index in self.preview_items:
+            if self.preview_canvas.find_withtag("current")[0] in [rect_id, text_id]:
+                self.drag_data["item"] = rect_id
+                self.drag_data["text"] = text_id
+                self.drag_data["index"] = index
+                self.drag_data["x"] = event.x
+                self.drag_data["y"] = event.y
+                
+                # Raise the rectangle and text to the top
+                self.preview_canvas.tag_raise(rect_id)
+                self.preview_canvas.tag_raise(text_id)
+                break
+    
+    def on_drag_motion(self, event):
+        # Compute how much the mouse has moved
+        if self.drag_data["item"] is not None:
+            dx = event.x - self.drag_data["x"]
+            dy = event.y - self.drag_data["y"]
+            
+            # Move the rectangle and text
+            self.preview_canvas.move(self.drag_data["item"], dx, dy)
+            self.preview_canvas.move(self.drag_data["text"], dx, dy)
+            
+            # Record the new position
+            self.drag_data["x"] = event.x
+            self.drag_data["y"] = event.y
+    
+    def on_drag_stop(self, event):
+        if self.drag_data["item"] is not None:
+            # Find which position this window should now be in
+            rect_coords = self.preview_canvas.coords(self.drag_data["item"])
+            rect_center_x = (rect_coords[0] + rect_coords[2]) / 2
+            rect_center_y = (rect_coords[1] + rect_coords[3]) / 2
+            
+            # Get all selected windows
+            selected_windows = self.get_selected_windows()
+            
+            closest_position = 0
+            min_distance = float('inf')
+            
+            # Calculate layout for current number of windows
+            canvas_width = self.preview_canvas.winfo_width()
+            canvas_height = self.preview_canvas.winfo_height()
+            layout = calculate_layout_preview(len(selected_windows), canvas_width, canvas_height)
+            
+            # Find closest position
+            for i, (x, y, w, h) in enumerate(layout):
+                center_x = x + w/2
+                center_y = y + h/2
+                
+                distance = math.sqrt((center_x - rect_center_x)**2 + (center_y - rect_center_y)**2)
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_position = i
+            
+            # Reorder the windows if position changed
+            if closest_position != self.drag_data["index"]:
+                # Get the window that was dragged
+                dragged_window = selected_windows[self.drag_data["index"]]
+                
+                # Remove from old position
+                selected_windows.pop(self.drag_data["index"])
+                
+                # Insert at new position
+                if closest_position >= len(selected_windows):
+                    selected_windows.append(dragged_window)
+                else:
+                    selected_windows.insert(closest_position, dragged_window)
+                
+                # Update custom order
+                self.custom_order = selected_windows
+                
+                # Redraw the preview with the new order
+                self.update_layout_preview()
+            
+            # Reset drag data
+            self.drag_data = {"x": 0, "y": 0, "item": None, "text": None, "index": -1}
+    
     def update_layout_preview(self):
         selected_windows = self.get_selected_windows()
         num_selected = len(selected_windows)
         
-        # Clear canvas
+        # Clear canvas and reset items list
         self.preview_canvas.delete("all")
+        self.preview_items = []
         
         if num_selected == 0:
             self.preview_canvas.create_text(
@@ -302,29 +413,71 @@ class WindowSelectorApp:
         # Calculate layout
         layout = calculate_layout_preview(num_selected, canvas_width, canvas_height)
         
-        # Draw rectangles for each window
-        colors = ["#4CAF50", "#2196F3", "#FFC107", "#FF5722", "#9C27B0", "#E91E63", "#00BCD4"]
-        
+        # Fixed list of dark pastel tertiary colors
+        tertiary_colors = [
+            "#8B5E3B",  # Burnt Sienna (Red-Orange)
+            "#556B2F",  # Dark Olive Green (Yellow-Green)
+            "#6B5B95",  # Dusky Purple (Blue-Violet)
+            "#8FBC8F",  # Dark Sea Green (Yellow-Green)
+            "#D2691E",  # Chocolate (Red-Orange)
+            "#4682B4",  # Steel Blue (Blue-Green)
+            "#DA70D6",  # Orchid (Red-Violet)
+            "#B8860B",  # Dark Goldenrod (Yellow-Orange)
+            "#5F9EA0",  # Cadet Blue (Blue-Green)
+            "#C71585",  # Medium Violet Red (Red-Violet)
+            "#A52A2A",  # Brown (Red-Orange)
+            "#2F4F4F",  # Dark Slate Gray (Blue-Green)
+        ]
+
+        # Persistent color mapping for each window title
+        if not hasattr(self, "window_color_map"):
+            self.window_color_map = {}
+
+        # Track used colors to avoid duplicates
+        used_colors = set(self.window_color_map.values())
+
+        # Assign colors only if a window doesn't have one yet
+        color_index = 0
+
         for i, (x, y, w, h) in enumerate(layout):
-            color = colors[i % len(colors)]
             window_title = selected_windows[i].title
-            
+
+            if window_title not in self.window_color_map:
+                # Find the next unused color
+                while tertiary_colors[color_index % len(tertiary_colors)] in used_colors:
+                    color_index += 1
+                
+                color = tertiary_colors[color_index % len(tertiary_colors)]
+                self.window_color_map[window_title] = color
+                used_colors.add(color)
+            else:
+                color = self.window_color_map[window_title]  # Retrieve assigned color
+
             # Create rectangle
-            self.preview_canvas.create_rectangle(x, y, x+w, y+h, fill=color, outline="white", width=2)
-            
+            rect_id = self.preview_canvas.create_rectangle(
+                x, y, x+w, y+h, 
+                fill=color, 
+                outline="white", 
+                width=2,
+                tags=("window",)
+            )
+
             # Create text (truncated if necessary)
-            max_chars = max(5, w // 8)  # Rough estimate for fitting text
+            max_chars = max(5, w // 8)
             display_title = window_title[:max_chars] + "..." if len(window_title) > max_chars else window_title
             
             text_x = x + w//2
             text_y = y + h//2
             
-            self.preview_canvas.create_text(
+            text_id = self.preview_canvas.create_text(
                 text_x, text_y,
                 text=display_title,
                 fill="white" if i % 2 == 0 else "black",
-                font=("Arial", 8, "bold")
+                font=("Arial", 8, "bold"),
+                tags=("window",)
             )
+            
+            self.preview_items.append((rect_id, text_id, i))
     
     def apply_tiling(self):
         selected_windows = self.get_selected_windows()
