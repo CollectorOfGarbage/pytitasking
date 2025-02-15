@@ -255,12 +255,24 @@ class WindowSelectorApp:
             row_frame.pack(fill=X, pady=2)
             
             cb = Checkbutton(row_frame, variable=var, text=window.title, 
-                            command=self.update_layout_preview)
+                            command=lambda w=window, v=var: self.on_checkbox_toggle(w, v))
             cb.pack(side=LEFT, anchor=W)
             
             # Bind events to show preview when hovering over checkbox
             cb.bind("<Enter>", lambda event, w=window: self.show_preview(w))
             row_frame.bind("<Enter>", lambda event, w=window: self.show_preview(w))
+    
+    def on_checkbox_toggle(self, window, var):
+        # Update the custom_order list when a checkbox is toggled
+        if var.get():
+            if window not in self.custom_order:
+                self.custom_order.append(window)
+        else:
+            if window in self.custom_order:
+                self.custom_order.remove(window)
+        
+        # Update the layout preview
+        self.update_layout_preview()
     
     def show_preview(self, window):
         self.preview_stringvars["title"].set(window.title)
@@ -284,24 +296,27 @@ class WindowSelectorApp:
     def select_all(self):
         for var in self.window_vars:
             var.set(True)
-        self.custom_order = []  # Reset custom order when selecting all
+        self.update_custom_order()  # Update custom_order with all selected windows
         self.update_layout_preview()
     
     def reset_order(self):
         self.custom_order = []  # Reset to default order
+        self.update_custom_order()  # Update custom_order with selected windows
         self.update_layout_preview()
     
     def get_selected_windows(self):
-        if self.custom_order:
-            # Return windows in custom order
-            return self.custom_order
+        # Filter custom_order to only include selected windows
+        selected_windows = [win for win in self.custom_order if win in self.windows and self.window_vars[self.windows.index(win)].get()]
         
-        # Return windows in original order
-        selected_windows = []
-        for i, var in enumerate(self.window_vars):
-            if var.get():
-                selected_windows.append(self.windows[i])
+        if not selected_windows:
+            # If no custom order, return windows in original order
+            selected_windows = [win for i, win in enumerate(self.windows) if self.window_vars[i].get()]
+        
         return selected_windows
+    
+    def update_custom_order(self):
+        # Initialize custom_order with selected windows
+        self.custom_order = [win for i, win in enumerate(self.windows) if self.window_vars[i].get()]
     
     def on_drag_start(self, event):
         # Record the item and its location
