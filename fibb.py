@@ -6,11 +6,23 @@ import math
 import win32gui
 import ctypes
 from ctypes import wintypes
-import tkinter as tk
-from tkinter import messagebox
 
-# Function to get visible windows on the current virtual desktop
 def get_windows():
+    """
+    Get all windows from the current virtual desktop only.
+    """
+    # Load required Windows DLLs
+    user32 = ctypes.WinDLL('user32')
+    dwmapi = ctypes.WinDLL('dwmapi')
+    
+    # Define necessary constants and structures
+    DWMWA_CLOAKED = 14
+    
+    # Get current virtual desktop identifier using VirtualDesktopAccessor.dll
+    # Note: This would require the VirtualDesktopAccessor.dll to be installed and loaded
+    # As an alternative approach, we'll filter based on window visibility and cloak status
+    
+    # Retrieve all windows using pygetwindow
     windows = gw.getWindowsWithTitle('')
     current_desktop_windows = []
     
@@ -24,10 +36,8 @@ def get_windows():
             # Check if window is visible
             if not win32gui.IsWindowVisible(hwnd):
                 continue
-            
+                
             # Check if window is cloaked (hidden by the system)
-            dwmapi = ctypes.WinDLL('dwmapi')
-            DWMWA_CLOAKED = 14
             cloaked = wintypes.DWORD()
             dwmapi.DwmGetWindowAttribute(
                 hwnd,
@@ -39,7 +49,7 @@ def get_windows():
             if cloaked.value != 0:
                 continue
                 
-            # If the window is visible and not cloaked, add it to the list
+            # If we made it here, the window is likely on the current desktop
             current_desktop_windows.append(win)
             
         except Exception as e:
@@ -48,11 +58,13 @@ def get_windows():
     print(f"Detected {len(current_desktop_windows)} windows on current virtual desktop.")
     return current_desktop_windows
 
-# Function to apply Fibonacci layout to selected windows
-def fibonacci_layout(selected_windows):
+def fibonacci_layout():
+    windows = get_windows()
+    for i in windows:
+        print(i.title)
     screen_width, screen_height = pyautogui.size()
     screen_height = screen_height - 50
-    num_windows = len(selected_windows)
+    num_windows = len(windows)
     
     if num_windows == 0:
         print("No windows detected.")
@@ -60,76 +72,49 @@ def fibonacci_layout(selected_windows):
     
     x, y, w, h = 0, 0, screen_width, screen_height
 
-    for i, win in enumerate(selected_windows):
-        if i != len(selected_windows) - 1:
+    for i, win in enumerate(windows):
+        print(len(windows))
+        if i != len(windows)-1:
             if i % 2 == 0:
-                # Even windows: split horizontally
-                w = math.floor(w / 2)
+                ## even windows left
+                w = math.floor(w/2)
                 try:
                     print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
                     win.moveTo(x, y)
                     win.resizeTo(w, h)
-                    x += w 
+                    x = x + w 
                 except Exception as e:
                     print(f"Could not move {win.title}: {e}")
             else:
-                # Odd windows: split vertically
-                h = math.floor(h / 2)
+                ## odd windows top
+                h = math.floor(h/2)
                 try:
                     print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
                     win.moveTo(x, y)
                     win.resizeTo(w, h)
-                    y += h
+                    y = y + h
                 except Exception as e:
                     print(f"Could not move {win.title}: {e}")
         else:
+            #print("last window ")
+            #print(x, y, w, h)
             try:
                 print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
                 win.moveTo(x, y)
                 win.resizeTo(w, h)
-                x += w 
+                x = x + w 
             except Exception as e:
                 print(f"Could not move {win.title}: {e}")
 
-# GUI for selecting windows to tile
-class WindowSelectorApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Select Windows to Tile")
-        
-        self.selected_windows = []
-        self.windows = get_windows()
-        
-        self.checkboxes = {}
-        
-        # Create a label and checkboxes for the windows
-        label = tk.Label(root, text="Select the windows to tile:")
-        label.pack(padx=10, pady=10)
-        
-        for win in self.windows:
-            var = tk.BooleanVar()
-            checkbox = tk.Checkbutton(root, text=win.title, variable=var)
-            checkbox.pack(anchor="w")
-            self.checkboxes[win.title] = var  # Use the window title as the key
-        
-        # Create a button to apply the tiling layout
-        tile_button = tk.Button(root, text="Apply Fibonacci Layout", command=self.apply_tiling)
-        tile_button.pack(pady=20)
-    
-    def apply_tiling(self):
-        # Collect selected windows based on the checkbox status
-        self.selected_windows = [win for win in self.windows if self.checkboxes[win.title].get()]
-        
-        if not self.selected_windows:
-            messagebox.showwarning("No Selection", "Please select at least one window to tile.")
-        else:
-            fibonacci_layout(self.selected_windows)
-
-# Main function to run the GUI
 def main():
-    root = tk.Tk()
-    app = WindowSelectorApp(root)
-    root.mainloop()
+    print("Tiling Window Manager started. Press Win+Shift+W to toggle Fibonacci mode.")
+    keyboard.add_hotkey("win+shift+w", fibonacci_layout)
+    
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting...")
 
 if __name__ == "__main__":
     main()
