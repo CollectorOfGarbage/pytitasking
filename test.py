@@ -3,13 +3,60 @@ import pyautogui
 import keyboard
 import time
 import math
+import win32gui
+import ctypes
+from ctypes import wintypes
 
 def get_windows():
-    # Get all windows and filter out irrelevant ones (minimized, system-related, etc.)
+    """
+    Get all windows from the current virtual desktop only.
+    """
+    # Load required Windows DLLs
+    user32 = ctypes.WinDLL('user32')
+    dwmapi = ctypes.WinDLL('dwmapi')
+    
+    # Define necessary constants and structures
+    DWMWA_CLOAKED = 14
+    
+    # Get current virtual desktop identifier using VirtualDesktopAccessor.dll
+    # Note: This would require the VirtualDesktopAccessor.dll to be installed and loaded
+    # As an alternative approach, we'll filter based on window visibility and cloak status
+    
+    # Retrieve all windows using pygetwindow
     windows = gw.getWindowsWithTitle('')
-    filtered_windows = [win for win in windows if win.title and not win.isMinimized]
-    print(f"Detected {len(filtered_windows)} relevant windows.")
-    return filtered_windows
+    current_desktop_windows = []
+    
+    for win in windows:
+        if not win.title or win.isMinimized:
+            continue
+        
+        try:
+            hwnd = win._hWnd
+            
+            # Check if window is visible
+            if not win32gui.IsWindowVisible(hwnd):
+                continue
+                
+            # Check if window is cloaked (hidden by the system)
+            cloaked = wintypes.DWORD()
+            dwmapi.DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_CLOAKED,
+                ctypes.byref(cloaked),
+                ctypes.sizeof(cloaked)
+            )
+            
+            if cloaked.value != 0:
+                continue
+                
+            # If we made it here, the window is likely on the current desktop
+            current_desktop_windows.append(win)
+            
+        except Exception as e:
+            print(f"Error with window {win.title}: {e}")
+    
+    print(f"Detected {len(current_desktop_windows)} windows on current virtual desktop.")
+    return current_desktop_windows
 
 def fibonacci_layout():
     windows = get_windows()
