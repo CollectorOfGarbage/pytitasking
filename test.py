@@ -10,6 +10,7 @@ from tkinter import LEFT, RIGHT, BOTH, X, Y, W, TOP, NW
 import hashlib
 import colorsys
 import re
+import keyboard  # Add this import
 
 # Function to get visible windows on the current virtual desktop
 def get_windows():
@@ -107,12 +108,12 @@ def extract_application_name(title):
 # Function to split title into prefix and application name
 def split_title(title):
     app_name = extract_application_name(title)
-    if app_name and app_name != title:
+    if (app_name and app_name != title):
         prefix = title[:-len(app_name)].rstrip(" -:")
         return prefix, app_name
     return title, ""
 
-# Function to apply Fibonacci layout to selected windows
+# Function to apply Fibonacci layout to selected windowsE
 def fibonacci_layout(selected_windows):
     screen_width, screen_height = pyautogui.size()
     screen_height = screen_height - 50  # Account for taskbar
@@ -180,54 +181,6 @@ def calculate_layout_preview(num_windows, canvas_width, canvas_height):
     
     return layout
 
-def three_vertical_layout(selected_windows):
-    screen_width, screen_height = pyautogui.size()
-    screen_height = screen_height - 50  # Account for taskbar
-    num_windows = len(selected_windows)
-    
-    if num_windows == 0:
-        print("No windows detected.")
-        return
-    
-    column_width = screen_width // 3
-    x, y, w, h = 0, 0, column_width, screen_height
-
-    for i, win in enumerate(selected_windows):
-        try:
-            print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
-            win.moveTo(x, y)
-            win.resizeTo(w, h)
-            x += w
-            if x >= screen_width:
-                x = 0
-                y += h
-        except Exception as e:
-            print(f"Could not move {win.title}: {e}")
-
-def four_vertical_layout(selected_windows):
-    screen_width, screen_height = pyautogui.size()
-    screen_height = screen_height - 50  # Account for taskbar
-    num_windows = len(selected_windows)
-    
-    if num_windows == 0:
-        print("No windows detected.")
-        return
-    
-    column_width = screen_width // 4
-    x, y, w, h = 0, 0, column_width, screen_height
-
-    for i, win in enumerate(selected_windows):
-        try:
-            print(f"Moving {win.title} to ({x}, {y}), size ({w}x{h})")
-            win.moveTo(x, y)
-            win.resizeTo(w, h)
-            x += w
-            if x >= screen_width:
-                x = 0
-                y += h
-        except Exception as e:
-            print(f"Could not move {win.title}: {e}")
-
 def vertical_layout(selected_windows):
     screen_width, screen_height = pyautogui.size()
     screen_height = screen_height - 50  # Account for taskbar
@@ -251,9 +204,9 @@ def vertical_layout(selected_windows):
 
 # GUI with checkboxes and layout preview
 class WindowSelectorApp:
-    def __init__(self, root):
+    def __init__(self, root, layout_mode):
         self.root = root
-        self.root.title("Windows Fibonacci Layout")
+        self.root.title("Windows Layout Manager")
         self.root.geometry("900x650")
         
         self.windows = get_windows()
@@ -361,35 +314,8 @@ class WindowSelectorApp:
         Button(button_frame, text="Reset Order", command=self.reset_order).pack(side=LEFT, padx=5)
         
         Button(button_frame, 
-               text="Apply Fibonacci Layout", 
-               command=self.apply_fibonacci_layout,
-               bg="#4CAF50", 
-               fg="white",
-               font=("Arial", 11, "bold"), 
-               padx=10, 
-               pady=5).pack(side=RIGHT, padx=5)
-        
-        Button(button_frame, 
-               text="Three Vertical Columns", 
-               command=self.apply_three_vertical_layout,
-               bg="#4CAF50", 
-               fg="white",
-               font=("Arial", 11, "bold"), 
-               padx=10, 
-               pady=5).pack(side=RIGHT, padx=5)
-        
-        Button(button_frame, 
-               text="Four Vertical Columns", 
-               command=self.apply_four_vertical_layout,
-               bg="#4CAF50", 
-               fg="white",
-               font=("Arial", 11, "bold"), 
-               padx=10, 
-               pady=5).pack(side=RIGHT, padx=5)
-
-        Button(button_frame, 
-               text="Vertical Columns", 
-               command=self.apply_vertical_layout,
+               text="Apply Layout", 
+               command=self.apply_layout,
                bg="#4CAF50", 
                fg="white",
                font=("Arial", 11, "bold"), 
@@ -397,6 +323,7 @@ class WindowSelectorApp:
                pady=5).pack(side=RIGHT, padx=5)
         
         # Initialize preview
+        self.layout_mode = layout_mode
         self.update_layout_preview()
     
     def create_checkboxes(self):
@@ -636,8 +563,9 @@ class WindowSelectorApp:
         if canvas_height < 10:
             canvas_height = 200
         
-        # Calculate layout
-        layout = calculate_layout_preview(num_selected, canvas_width, canvas_height)
+        # Calculate vertical layout
+        column_width = canvas_width // num_selected
+        layout = [(i * column_width, 0, column_width, canvas_height) for i in range(num_selected)]
         
         # Fixed list of dark pastel tertiary colors
         tertiary_colors = [
@@ -738,47 +666,31 @@ class WindowSelectorApp:
             # Add all items to the list
             self.preview_items.append((rect_id, app_name_id, title_id, i))
     
-    def apply_fibonacci_layout(self):
+    def apply_layout(self):
         selected_windows = self.get_selected_windows()
         
         if not selected_windows:
             messagebox.showwarning("No Selection", "Please select at least one window to tile.")
             return
         
-        fibonacci_layout(selected_windows)
-    
-    def apply_three_vertical_layout(self):
-        selected_windows = self.get_selected_windows()
-        
-        if not selected_windows:
-            messagebox.showwarning("No Selection", "Please select at least one window to tile.")
-            return
-        
-        three_vertical_layout(selected_windows)
-    
-    def apply_four_vertical_layout(self):
-        selected_windows = self.get_selected_windows()
-        
-        if not selected_windows:
-            messagebox.showwarning("No Selection", "Please select at least one window to tile.")
-            return
-        
-        four_vertical_layout(selected_windows)
-
-    def apply_vertical_layout(self):
-        selected_windows = self.get_selected_windows()
-        
-        if not selected_windows:
-            messagebox.showwarning("No Selection", "Please select at least one window to tile.")
-            return
-        
-        vertical_layout(selected_windows)
+        if self.layout_mode == "fibonacci":
+            fibonacci_layout(selected_windows)
+        elif self.layout_mode == "vertical":
+            vertical_layout(selected_windows)
 
 # Main function to run the GUI
 def main():
-    root = tk.Tk()
-    app = WindowSelectorApp(root)
-    root.mainloop()
+    def launch_app(layout_mode):
+        root = tk.Tk()
+        app = WindowSelectorApp(root, layout_mode)
+        root.mainloop()
+
+    # Listen for keypresses
+    keyboard.add_hotkey('win+shift+w', lambda: launch_app("fibonacci"))
+    keyboard.add_hotkey('win+shift+e', lambda: launch_app("vertical"))
+
+    # Keep the script running to listen for keypresses
+    keyboard.wait()
 
 if __name__ == "__main__":
     main()
