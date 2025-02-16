@@ -567,20 +567,20 @@ class WindowSelectorApp:
         column_width = canvas_width // num_selected
         layout = [(i * column_width, 0, column_width, canvas_height) for i in range(num_selected)]
         
-        # Fixed list of dark pastel tertiary colors
-        tertiary_colors = [
-            "#8B5E3B",  # Burnt Sienna (Red-Orange)
-            "#556B2F",  # Dark Olive Green (Yellow-Green)
-            "#6B5B95",  # Dusky Purple (Blue-Violet)
-            "#8FBC8F",  # Dark Sea Green (Yellow-Green)
-            "#D2691E",  # Chocolate (Red-Orange)
-            "#4682B4",  # Steel Blue (Blue-Green)
-            "#DA70D6",  # Orchid (Red-Violet)
-            "#B8860B",  # Dark Goldenrod (Yellow-Orange)
-            "#5F9EA0",  # Cadet Blue (Blue-Green)
-            "#C71585",  # Medium Violet Red (Red-Violet)
-            "#A52A2A",  # Brown (Red-Orange)
-            "#2F4F4F",  # Dark Slate Gray (Blue-Green)
+        # Fixed list of vibrant colors
+        vibrant_colors = [
+            "#FF5733",  # Vibrant Red-Orange
+            "#33FF57",  # Vibrant Green
+            "#3357FF",  # Vibrant Blue
+            "#FF33A1",  # Vibrant Pink
+            "#FFBD33",  # Vibrant Yellow-Orange
+            "#33FFF5",  # Vibrant Cyan
+            "#8D33FF",  # Vibrant Purple
+            "#FF3380",  # Vibrant Magenta
+            "#33FF8D",  # Vibrant Lime
+            "#FF5733",  # Vibrant Coral
+            "#FF33D4",  # Vibrant Fuchsia
+            "#33FFBD",  # Vibrant Mint
         ]
 
         # Persistent color mapping for each window title
@@ -599,10 +599,10 @@ class WindowSelectorApp:
 
             if window_title not in self.window_color_map:
                 # Find the next unused color
-                while tertiary_colors[color_index % len(tertiary_colors)] in used_colors:
+                while vibrant_colors[color_index % len(vibrant_colors)] in used_colors:
                     color_index += 1
                 
-                color = tertiary_colors[color_index % len(tertiary_colors)]
+                color = vibrant_colors[color_index % len(vibrant_colors)]
                 self.window_color_map[window_title] = color
                 used_colors.add(color)
             else:
