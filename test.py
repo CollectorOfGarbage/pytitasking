@@ -9,6 +9,7 @@ from tkinter import messagebox, Frame, Label, Button, Scrollbar, Checkbutton, Bo
 from tkinter import LEFT, RIGHT, BOTH, X, Y, W, TOP, NW
 import hashlib
 import colorsys
+import re
 
 # Function to get visible windows on the current virtual desktop
 def get_windows():
@@ -53,6 +54,63 @@ def get_windows():
     
     print(f"Detected {len(current_desktop_windows)} windows on current virtual desktop.")
     return current_desktop_windows
+
+# Function to extract application name from window title
+def extract_application_name(title):
+    # Common application identifiers that typically appear at the end
+    common_apps = [
+        "Microsoft Edge",
+        "Google Chrome",
+        "Firefox",
+        "Visual Studio Code",
+        "Visual Studio",
+        "File Explorer",
+        "Notepad",
+        "Notepad++",
+        "Excel",
+        "Word",
+        "PowerPoint",
+        "Outlook",
+        "Teams",
+        "Slack",
+        "Discord",
+        "Spotify"
+    ]
+    
+    # Check if any common app name appears at the end
+    for app in common_apps:
+        if title.endswith(app):
+            return app
+    
+    # Try to match patterns with dashes or colons
+    patterns = [
+        r".*- ([^-]+)$",  # Match text after last dash
+        r".*: ([^:]+)$",  # Match text after last colon
+    ]
+    
+    for pattern in patterns:
+        match = re.match(pattern, title)
+        if match:
+            app_name = match.group(1).strip()
+            if app_name:
+                return app_name
+    
+    # Fall back to getting the last part after a dash or colon if it exists
+    if " - " in title:
+        return title.split(" - ")[-1].strip()
+    if ": " in title:
+        return title.split(": ")[-1].strip()
+    
+    # If all else fails, return the whole title
+    return title
+
+# Function to split title into prefix and application name
+def split_title(title):
+    app_name = extract_application_name(title)
+    if app_name and app_name != title:
+        prefix = title[:-len(app_name)].rstrip(" -:")
+        return prefix, app_name
+    return title, ""
 
 # Function to apply Fibonacci layout to selected windows
 def fibonacci_layout(selected_windows):
@@ -134,13 +192,14 @@ class WindowSelectorApp:
         self.custom_order = []  # Keep track of custom window order
         self.preview_stringvars = {
             "title": StringVar(value=""),
+            "app_name": StringVar(value=""),
             "size": StringVar(value=""),
             "position": StringVar(value=""),
         }
         
         # Variables for dragging
         self.drag_data = {"x": 0, "y": 0, "item": None, "index": -1}
-        self.preview_items = []  # List of (rect_id, text_id, window_index)
+        self.preview_items = []  # List of (rect_id, app_name_id, title_id, window_index)
         
         # Main frame
         main_frame = Frame(root, padx=10, pady=10)
@@ -192,6 +251,10 @@ class WindowSelectorApp:
         
         preview_box = Frame(right_frame, bd=1, relief=tk.SOLID, padx=10, pady=10)
         preview_box.pack(fill=X, padx=5, pady=5)
+        
+        # Changed order: App name first, then title
+        Label(preview_box, text="Application:").pack(anchor=W, pady=2)
+        Label(preview_box, textvariable=self.preview_stringvars["app_name"], font=("Arial", 9, "bold"), wraplength=270).pack(anchor=W, pady=(0, 5))
         
         Label(preview_box, text="Title:").pack(anchor=W, pady=2)
         Label(preview_box, textvariable=self.preview_stringvars["title"], wraplength=270).pack(anchor=W, pady=(0, 5))
@@ -254,13 +317,41 @@ class WindowSelectorApp:
             row_frame = Frame(self.checkbox_frame)
             row_frame.pack(fill=X, pady=2)
             
-            cb = Checkbutton(row_frame, variable=var, text=window.title, 
-                            command=lambda w=window, v=var: self.on_checkbox_toggle(w, v))
+            title_prefix, app_name = split_title(window.title)
+            
+            # Create checkbox
+            cb = Checkbutton(row_frame, variable=var, 
+                           command=lambda w=window, v=var: self.on_checkbox_toggle(w, v))
             cb.pack(side=LEFT, anchor=W)
             
-            # Bind events to show preview when hovering over checkbox
+            # Create a frame to hold the title parts
+            title_frame = Frame(row_frame)
+            title_frame.pack(side=LEFT, fill=X, expand=True)
+            
+            # First show app name in bold if it exists
+            if app_name:
+                app_label = Label(title_frame, text=app_name, font=("Arial", 9, "bold"))
+                app_label.pack(side=LEFT, anchor=W)
+                
+                # Add separator if both parts exist
+                if title_prefix:
+                    separator = Label(title_frame, text=" - ")
+                    separator.pack(side=LEFT, anchor=W)
+            
+            # Then add the prefix part
+            if title_prefix:
+                prefix_label = Label(title_frame, text=title_prefix)
+                prefix_label.pack(side=LEFT, anchor=W)
+            elif not app_name:
+                # If no app name and no prefix, show the whole title
+                title_label = Label(title_frame, text=window.title)
+                title_label.pack(side=LEFT, anchor=W)
+            
+            # Bind events to show preview
             cb.bind("<Enter>", lambda event, w=window: self.show_preview(w))
-            row_frame.bind("<Enter>", lambda event, w=window: self.show_preview(w))
+            title_frame.bind("<Enter>", lambda event, w=window: self.show_preview(w))
+            for child in title_frame.winfo_children():
+                child.bind("<Enter>", lambda event, w=window: self.show_preview(w))
     
     def on_checkbox_toggle(self, window, var):
         # Update the custom_order list when a checkbox is toggled
@@ -275,7 +366,9 @@ class WindowSelectorApp:
         self.update_layout_preview()
     
     def show_preview(self, window):
+        title_prefix, app_name = split_title(window.title)
         self.preview_stringvars["title"].set(window.title)
+        self.preview_stringvars["app_name"].set(app_name if app_name else "(Unknown application)")
         self.preview_stringvars["size"].set(f"{window.width} x {window.height}")
         self.preview_stringvars["position"].set(f"({window.left}, {window.top})")
     
@@ -320,18 +413,35 @@ class WindowSelectorApp:
     
     def on_drag_start(self, event):
         # Record the item and its location
-        for rect_id, text_id, index in self.preview_items:
-            if self.preview_canvas.find_withtag("current")[0] in [rect_id, text_id]:
-                self.drag_data["item"] = rect_id
-                self.drag_data["text"] = text_id
-                self.drag_data["index"] = index
-                self.drag_data["x"] = event.x
-                self.drag_data["y"] = event.y
-                
-                # Raise the rectangle and text to the top
-                self.preview_canvas.tag_raise(rect_id)
-                self.preview_canvas.tag_raise(text_id)
-                break
+        for items in self.preview_items:
+            if len(items) == 4:  # Format with app name text
+                rect_id, app_name_id, title_id, index = items
+                if self.preview_canvas.find_withtag("current")[0] in [rect_id, app_name_id, title_id]:
+                    self.drag_data["item"] = rect_id
+                    self.drag_data["app_name"] = app_name_id
+                    self.drag_data["title"] = title_id
+                    self.drag_data["index"] = index
+                    self.drag_data["x"] = event.x
+                    self.drag_data["y"] = event.y
+                    
+                    # Raise all elements to the top
+                    self.preview_canvas.tag_raise(rect_id)
+                    self.preview_canvas.tag_raise(app_name_id)
+                    self.preview_canvas.tag_raise(title_id)
+                    break
+            else:  # Legacy format for backward compatibility
+                rect_id, text_id, index = items
+                if self.preview_canvas.find_withtag("current")[0] in [rect_id, text_id]:
+                    self.drag_data["item"] = rect_id
+                    self.drag_data["title"] = text_id
+                    self.drag_data["index"] = index
+                    self.drag_data["x"] = event.x
+                    self.drag_data["y"] = event.y
+                    
+                    # Raise the rectangle and text to the top
+                    self.preview_canvas.tag_raise(rect_id)
+                    self.preview_canvas.tag_raise(text_id)
+                    break
     
     def on_drag_motion(self, event):
         # Compute how much the mouse has moved
@@ -339,9 +449,14 @@ class WindowSelectorApp:
             dx = event.x - self.drag_data["x"]
             dy = event.y - self.drag_data["y"]
             
-            # Move the rectangle and text
+            # Move the rectangle and texts
             self.preview_canvas.move(self.drag_data["item"], dx, dy)
-            self.preview_canvas.move(self.drag_data["text"], dx, dy)
+            
+            if "app_name" in self.drag_data and self.drag_data["app_name"] is not None:
+                self.preview_canvas.move(self.drag_data["app_name"], dx, dy)
+                
+            if "title" in self.drag_data and self.drag_data["title"] is not None:
+                self.preview_canvas.move(self.drag_data["title"], dx, dy)
             
             # Record the new position
             self.drag_data["x"] = event.x
@@ -396,7 +511,7 @@ class WindowSelectorApp:
                 self.update_layout_preview()
             
             # Reset drag data
-            self.drag_data = {"x": 0, "y": 0, "item": None, "text": None, "index": -1}
+            self.drag_data = {"x": 0, "y": 0, "item": None, "app_name": None, "title": None, "index": -1}
     
     def update_layout_preview(self):
         selected_windows = self.get_selected_windows()
@@ -456,6 +571,7 @@ class WindowSelectorApp:
 
         for i, (x, y, w, h) in enumerate(layout):
             window_title = selected_windows[i].title
+            title_prefix, app_name = split_title(window_title)
 
             if window_title not in self.window_color_map:
                 # Find the next unused color
@@ -477,22 +593,54 @@ class WindowSelectorApp:
                 tags=("window",)
             )
 
-            # Create text (truncated if necessary)
-            max_chars = max(5, w // 8)
-            display_title = window_title[:max_chars] + "..." if len(window_title) > max_chars else window_title
+            # Determine if we need to make space for app name and title
+            has_app_name = bool(app_name)
             
-            text_x = x + w//2
-            text_y = y + h//2
+            # First create app name at top if it exists
+            if app_name:
+                max_chars = max(5, w // 7)  # Allow slightly longer app names
+                display_app = app_name[:max_chars] + "..." if len(app_name) > max_chars else app_name
+                
+                app_name_id = self.preview_canvas.create_text(
+                    x + w//2, y + 15,
+                    text=display_app,
+                    fill="white",
+                    font=("Arial", 8, "bold"),
+                    tags=("window",)
+                )
+            else:
+                app_name_id = None
             
-            text_id = self.preview_canvas.create_text(
-                text_x, text_y,
-                text=display_title,
-                fill="white" if i % 2 == 0 else "black",
-                font=("Arial", 8, "bold"),
-                tags=("window",)
-            )
+            # Then create title text at bottom (prefix part)
+            if title_prefix:
+                max_chars = max(5, w // 8)
+                display_prefix = title_prefix[:max_chars] + "..." if len(title_prefix) > max_chars else title_prefix
+                
+                title_id = self.preview_canvas.create_text(
+                    x + w//2, y + h - 15,
+                    text=display_prefix,
+                    fill="white" if i % 2 == 0 else "black",
+                    font=("Arial", 8),
+                    tags=("window",)
+                )
+            else:
+                # If no prefix, still need a placeholder for the item list
+                if not app_name_id:
+                    max_chars = max(5, w // 8)
+                    display_title = window_title[:max_chars] + "..." if len(window_title) > max_chars else window_title
+                    
+                    title_id = self.preview_canvas.create_text(
+                        x + w//2, y + h//2,
+                        text=display_title,
+                        fill="white" if i % 2 == 0 else "black",
+                        font=("Arial", 8),
+                        tags=("window",)
+                    )
+                else:
+                    title_id = None
             
-            self.preview_items.append((rect_id, text_id, i))
+            # Add all items to the list
+            self.preview_items.append((rect_id, app_name_id, title_id, i))
     
     def apply_tiling(self):
         selected_windows = self.get_selected_windows()
