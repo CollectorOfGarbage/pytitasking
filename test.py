@@ -11,6 +11,7 @@ import hashlib
 import colorsys
 import re
 import keyboard  # Add this import
+import random
 
 # Function to get visible windows on the current virtual desktop
 def get_windows():
@@ -93,7 +94,7 @@ def extract_application_name(title):
 # Function to split title into prefix and application name
 def split_title(title):
     app_name = extract_application_name(title)
-    if app_name and app_name != title:
+    if (app_name and app_name != title):
         prefix = title[:-len(app_name)].rstrip(" -:")
         return prefix, app_name
     return "", title
@@ -697,6 +698,7 @@ def main():
     
     def auto_tile(layout_mode):
         windows = get_windows()
+        random.shuffle(windows)  # Shuffle the window order
         if layout_mode == "fibonacci":
             fibonacci_layout(windows)
         elif layout_mode == "vertical":
