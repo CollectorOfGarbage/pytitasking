@@ -83,35 +83,20 @@ def extract_application_name(title):
         if title.endswith(app):
             return app
     
-    # Try to match patterns with dashes or colons
-    patterns = [
-        r".*- ([^-]+)$",  # Match text after last dash
-        r".*: ([^:]+)$",  # Match text after last colon
-    ]
-    
-    for pattern in patterns:
-        match = re.match(pattern, title)
-        if match:
-            app_name = match.group(1).strip()
-            if app_name:
-                return app_name
-    
-    # Fall back to getting the last part after a dash or colon if it exists
+    # If title contains a dash, return the text after the last dash
     if " - " in title:
         return title.split(" - ")[-1].strip()
-    if ": " in title:
-        return title.split(": ")[-1].strip()
     
-    # If all else fails, return the whole title
+    # If no dash, return the whole title as the program name
     return title
 
 # Function to split title into prefix and application name
 def split_title(title):
     app_name = extract_application_name(title)
-    if (app_name and app_name != title):
+    if app_name and app_name != title:
         prefix = title[:-len(app_name)].rstrip(" -:")
         return prefix, app_name
-    return title, ""
+    return "", title
 
 # Function to apply Fibonacci layout to selected windowsE
 def fibonacci_layout(selected_windows):
@@ -322,6 +307,16 @@ class WindowSelectorApp:
                padx=10, 
                pady=5).pack(side=RIGHT, padx=5)
         
+        # Add a new button to apply layout to all windows
+        Button(button_frame, 
+               text="Apply to All Windows", 
+               command=self.apply_layout_to_all,
+               bg="#FF5733", 
+               fg="white",
+               font=("Arial", 11, "bold"), 
+               padx=10, 
+               pady=5).pack(side=RIGHT, padx=5)
+
         # Initialize preview
         self.layout_mode = layout_mode
         self.update_layout_preview()
@@ -563,9 +558,12 @@ class WindowSelectorApp:
         if canvas_height < 10:
             canvas_height = 200
         
-        # Calculate vertical layout
-        column_width = canvas_width // num_selected
-        layout = [(i * column_width, 0, column_width, canvas_height) for i in range(num_selected)]
+        # Calculate layout based on the selected mode
+        if self.layout_mode == "fibonacci":
+            layout = calculate_layout_preview(num_selected, canvas_width, canvas_height)
+        elif self.layout_mode == "vertical":
+            column_width = canvas_width // num_selected
+            layout = [(i * column_width, 0, column_width, canvas_height) for i in range(num_selected)]
         
         # Fixed list of vibrant colors
         vibrant_colors = [
@@ -677,6 +675,18 @@ class WindowSelectorApp:
             fibonacci_layout(selected_windows)
         elif self.layout_mode == "vertical":
             vertical_layout(selected_windows)
+        
+        # Close the window after applying the layout
+        self.root.destroy()
+
+    def apply_layout_to_all(self):
+        if self.layout_mode == "fibonacci":
+            fibonacci_layout(self.windows)
+        elif self.layout_mode == "vertical":
+            vertical_layout(self.windows)
+            
+        # Close the window after applying the layout
+        self.root.destroy()
 
 # Main function to run the GUI
 def main():
@@ -684,10 +694,19 @@ def main():
         root = tk.Tk()
         app = WindowSelectorApp(root, layout_mode)
         root.mainloop()
+    
+    def auto_tile(layout_mode):
+        windows = get_windows()
+        if layout_mode == "fibonacci":
+            fibonacci_layout(windows)
+        elif layout_mode == "vertical":
+            vertical_layout(windows)
 
     # Listen for keypresses
     keyboard.add_hotkey('win+shift+w', lambda: launch_app("fibonacci"))
     keyboard.add_hotkey('win+shift+e', lambda: launch_app("vertical"))
+    keyboard.add_hotkey('ctrl+win+up', lambda: auto_tile("vertical"))
+    keyboard.add_hotkey('ctrl+win+down', lambda: auto_tile("fibonacci"))
 
     # Keep the script running to listen for keypresses
     keyboard.wait()
