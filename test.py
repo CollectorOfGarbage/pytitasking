@@ -12,6 +12,8 @@ import colorsys
 import re
 import keyboard  # Add this import
 import random
+import pystray  # Add this import
+from PIL import Image, ImageDraw  # Add this import
 
 # Function to get visible windows on the current virtual desktop
 def get_windows():
@@ -689,6 +691,31 @@ class WindowSelectorApp:
         # Close the window after applying the layout
         self.root.destroy()
 
+# Function to create an icon for the system tray
+def create_image():
+    # Generate an image for the system tray icon
+    width = 64
+    height = 64
+    image = Image.new('RGB', (width, height), (255, 255, 255))
+    dc = ImageDraw.Draw(image)
+    dc.rectangle(
+        (width // 4, height // 4, width * 3 // 4, height * 3 // 4),
+        fill=(0, 0, 0))
+    return image
+
+def on_quit(icon, item):
+    icon.stop()
+    exit(0)
+
+def setup_tray_icon():
+    icon = pystray.Icon("pytitasking")
+    icon.icon = create_image()
+    icon.title = "Pytitasking"
+    icon.menu = pystray.Menu(
+        pystray.MenuItem("Quit", on_quit)
+    )
+    icon.run()
+
 # Main function to run the GUI
 def main():
     def launch_app(layout_mode):
@@ -709,6 +736,12 @@ def main():
     keyboard.add_hotkey('win+shift+e', lambda: launch_app("vertical"))
     keyboard.add_hotkey('ctrl+win+up', lambda: auto_tile("vertical"))
     keyboard.add_hotkey('ctrl+win+down', lambda: auto_tile("fibonacci"))
+
+    # Start the system tray icon in a separate thread
+    import threading
+    tray_thread = threading.Thread(target=setup_tray_icon)
+    tray_thread.daemon = True
+    tray_thread.start()
 
     # Keep the script running to listen for keypresses
     keyboard.wait()

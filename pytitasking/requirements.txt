@@ -1,0 +1,7 @@
+tkinter
+pystray
+Pillow
+keyboard
+pyautogui
+random
+math
