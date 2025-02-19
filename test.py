@@ -13,7 +13,7 @@ import re
 import keyboard  # Add this import
 import random
 import pystray  # Add this import
-from PIL import Image, ImageDraw  # Add this import
+from PIL import Image, ImageDraw, ImageFont  # Add this import
 
 # Function to get visible windows on the current virtual desktop
 def get_windows():
@@ -693,18 +693,30 @@ class WindowSelectorApp:
 
 # Function to create an icon for the system tray
 def create_image():
-    # Generate an image for the system tray icon
     width = 64
     height = 64
-    image = Image.new('RGB', (width, height), (255, 255, 255))
+    image = Image.new('RGB', (width, height), (211, 211, 211))  # Light grey background
     dc = ImageDraw.Draw(image)
-    dc.rectangle(
-        (width // 4, height // 4, width * 3 // 4, height * 3 // 4),
-        fill=(0, 0, 0))
+    
+    # Load a font
+    try:
+        font = ImageFont.truetype("arial.ttf", 36)
+    except IOError:
+        font = ImageFont.load_default()
+    
+    # Draw a blue "M" in the center
+    text = "M"
+    text_bbox = dc.textbbox((0, 0), text, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+    position = ((width - text_width) // 2, (height - text_height) // 2)
+    dc.text(position, text, fill=(0, 0, 255), font=font)  # Blue color
+    
     return image
 
 def on_quit(icon, item):
     icon.stop()
+    keyboard.unhook_all()  # Stop listening for keyboard events
     exit(0)
 
 def setup_tray_icon():
@@ -732,6 +744,8 @@ def main():
             vertical_layout(windows)
 
     # Listen for keypresses
+    keyboard.add_hotkey((91, 29, 72), lambda: auto_tile("vertical"))
+    keyboard.add_hotkey((91, 29, 80), lambda: auto_tile("fibonacci"))
     keyboard.add_hotkey('win+shift+w', lambda: launch_app("fibonacci"))
     keyboard.add_hotkey('win+shift+e', lambda: launch_app("vertical"))
     keyboard.add_hotkey('ctrl+win+up', lambda: auto_tile("vertical"))

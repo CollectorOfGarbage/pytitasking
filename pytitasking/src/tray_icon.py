@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import pystray
 from pystray import MenuItem, Icon
 import sys
@@ -6,11 +6,21 @@ import sys
 def create_image():
     width = 64
     height = 64
-    image = Image.new('RGB', (width, height), (255, 255, 255))
+    image = Image.new('RGB', (width, height), (211, 211, 211))  # Light grey background
     dc = ImageDraw.Draw(image)
-    dc.rectangle(
-        (width // 4, height // 4, width * 3 // 4, height * 3 // 4),
-        fill=(0, 0, 0))
+    
+    # Load a font
+    try:
+        font = ImageFont.truetype("arial.ttf", 36)
+    except IOError:
+        font = ImageFont.load_default()
+    
+    # Draw a blue "M" in the center
+    text = "M"
+    text_width, text_height = dc.textsize(text, font=font)
+    position = ((width - text_width) // 2, (height - text_height) // 2)
+    dc.text(position, text, fill=(0, 0, 255), font=font)  # Blue color
+    
     return image
 
 def on_quit(icon, item):
